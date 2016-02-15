@@ -1,29 +1,3 @@
-##########################################################################
-#
-#    Program for continuous UDP transmission of images from one computer
-#    to another, more specifically from the Raspberry Pi to the Linux
-#    Virtual Machine.
-#
-#    This program acts as the transmitter of the image
-#    The program that serves as the receiver can be found at:
-#       /home/pi/GMU-ECE590/HW2/vm_files/rx_image.py
-#
-#    To successfully transmit and receive a image:
-#           1) Update the programs to suit your machines for the following
-#              parameters:
-#                    a) Ip addresses
-#                    b) ports
-#                    C) path of the image
-#           2) Run rx_image.py on the receiving machine
-#           3) Run tx_image.py on the transmitting machine
-#
-#    Notes of caution:
-#           1) The program will stall if the image window is clicked
-#
-##########################################################################
-
-
-
 import socket
 import time
 import os
@@ -47,12 +21,13 @@ img2_name = "robot2_gray.bmp"
 
 tx_count = 0
 prev_time = 0    #Time of previous image transmission, used to obtain frequency
-
 while True:    
-    tx_count = tx_count + 1
-    
+
+    #Recive confirmation to start tx (sync Rx and Tx programs)
+    start = cpu2pi_sock.recv(512)
 
     #Alternate images for transmission
+    tx_count = tx_count + 1
     if (tx_count % 2 == 1):
         img_path = img1_path
         img_name = img1_name
@@ -60,23 +35,23 @@ while True:
         img_path = img2_path
         img_name = img2_name
     
-    #Send the image information to the computer
-    size = os.path.getsize(img_path + img_name )
-    pi2cpu_sock.sendto(img_name,(comp_ip, pi2cpu_port))
-
+    #Transmission Information
+    size = os.path.getsize( img_path + img_name )
     bytes_per_chunk = 32768
-    pi2cpu_sock.sendto(str(bytes_per_chunk),(comp_ip, pi2cpu_port))
-
     chunks = size / bytes_per_chunk
-    pi2cpu_sock.sendto(str(chunks),(comp_ip, pi2cpu_port))
-
     left_over_chunk = size % bytes_per_chunk
+    
+    #Send the image information to the computer
+    print "sending image name"
+    pi2cpu_sock.sendto(img_name,(comp_ip, pi2cpu_port))
+    print "sending bytes per chunk"
+    pi2cpu_sock.sendto(str(bytes_per_chunk),(comp_ip, pi2cpu_port))
+    print "sending number of chunks"
+    pi2cpu_sock.sendto(str(chunks),(comp_ip, pi2cpu_port))
+    print "sending left_over_chunk size"
     pi2cpu_sock.sendto(str(left_over_chunk),(comp_ip, pi2cpu_port))
-
-    size = os.path.getsize(img_path + img_name )
+    print "sending image size"
     pi2cpu_sock.sendto(str(size),(comp_ip, pi2cpu_port))
-
-    proceed1 = cpu2pi_sock.recv(512)
     
     #Send the image to the computer, (Transmit file in chunks)
     img = open(img_path + img_name, 'r')
@@ -90,14 +65,14 @@ while True:
     while (count < chunks):
         line = img.read(bytes_per_chunk)
         start_t = time.time()
-        time.sleep(0.0125)
+        print "chunk %i" %(count+1)
         pi2cpu_sock.sendto(line, (comp_ip, pi2cpu_port))
         end_t = time.time()
         time_dur = time_dur + (end_t-start_t)
         count = count + 1
     line = img.read(left_over_chunk)
-    time.sleep(0.0125)
     start_t = time.time()
+    print "Sending Remainder"
     pi2cpu_sock.sendto(line, (comp_ip, pi2cpu_port))
     end_t = time.time()
     time_dur = time_dur + (end_t - start_t)
@@ -107,12 +82,13 @@ while True:
     
     #Print transmission stats
     bit_rate = (size*8)/time_dur
-    print "TX-%i)Size(bytes): %i \tTx Duration(ms): %2.2f \tBit Rate(Mbps): %2.2f \tFrequency(Hz): %1.2f\t Image: %s" %(tx_count, size, (time_dur*1000), (bit_rate/1000000),(1/tx_dur), img_name)
+    print "%i)Size(bytes): %i \tTx Duration(ms): %2.2f \tBit Rate(Mbps): %2.2f \tFrequency(Hz): %1.2f\t Image: %s" %(tx_count, size, (time_dur*1000), (bit_rate/1000000),(1/tx_dur), img_name)
     
-    proceed2 = cpu2pi_sock.recv(528)
+    #Recive confirmation of end transmission (for Rx Tx sync purposes)
+    end = cpu2pi_sock.recv(512)
 
     #For transmission frequency of ~5Hz
-#    time.sleep(0.03)
+    time.sleep(0.17)
 
 #Close the socket
 pi2cpu_sock.close()

@@ -19,7 +19,7 @@ image_write = open(path + "tx_"+ name, 'w')
 
 #Copy the image into a new file
 count = 0
-#For chunks of 32768 bytes
+#For the chunks of 32768 bytes
 while (count < chunks):
 	line = image_read.read(bytesPerChunk)
 	image_write.write(line)
